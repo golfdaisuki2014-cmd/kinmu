@@ -24,6 +24,8 @@ button{cursor:pointer}
 .nav b{font-size:17px}
 .nav button{background:none;border:0;color:#fff;font-size:22px;padding:6px 14px}
 .big{margin:14px 0 2px;font-size:13px;color:#b9c0c8}
+.tot{margin-top:6px;font-size:15px}
+.tot b{color:var(--road)}
 .ot{font-size:40px;font-weight:700;color:var(--road);letter-spacing:.01em}
 .sub{display:flex;flex-wrap:wrap;gap:4px 22px;margin-top:10px;font-size:14px;color:#dfe3e7}
 .wrap{padding:14px 14px 0;max-width:640px;margin:0 auto}
@@ -103,6 +105,7 @@ function render(){
     <div class="nav"><button onclick="shiftMonth(-1)" aria-label="前の月">‹</button><b>${y}年${Number(m)}月</b><button onclick="shiftMonth(1)" aria-label="次の月">›</button></div>
     <div class="big">超過勤務 合計</div>
     <div class="ot">${fmt(sum(list,'ot'))}</div>
+    <div class="tot">超過＋休日 合計　<b>${fmt(sum(list,'ot')+sum(list,'hol'))}</b></div>
     <div class="sub"><span>勤務 ${list.length}日</span><span>休日勤務 ${fmt(sum(list,'hol'))}</span><span>深夜 ${fmt(sum(list,'night'))}</span></div>
   </div>
   <div class="wrap">
@@ -197,9 +200,9 @@ function delRecord(){
 async function exportCSV(){
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
   const list=inMonth().reverse();
-  const lines=[['勤務日','出勤時刻','退勤時刻','休憩時間(分)','休日出勤','コース','同乗者','付帯作業','備考','実働時間','超過勤務','休日勤務','深夜勤務']];
-  for(const r of list){const c=calc(r);lines.push([r.date,r.start,r.end,r.brk,r.holiday?'○':'',r.route,r.companion,(r.tasks||[]).join('、'),r.notes,fmt(c.work),fmt(c.ot),fmt(c.hol),fmt(c.night)])}
-  lines.push([`合計（${list.length}日）`,'','','','','','','','',fmt(sum(list,'work')),fmt(sum(list,'ot')),fmt(sum(list,'hol')),fmt(sum(list,'night'))]);
+  const lines=[['勤務日','出勤時刻','退勤時刻','休憩時間(分)','休日出勤','コース','同乗者','付帯作業','備考','実働時間','超過勤務','休日勤務','超過＋休日','深夜勤務']];
+  for(const r of list){const c=calc(r);lines.push([r.date,r.start,r.end,r.brk,r.holiday?'○':'',r.route,r.companion,(r.tasks||[]).join('、'),r.notes,fmt(c.work),fmt(c.ot),fmt(c.hol),fmt(c.ot+c.hol),fmt(c.night)])}
+  lines.push([`合計（${list.length}日）`,'','','','','','','','',fmt(sum(list,'work')),fmt(sum(list,'ot')),fmt(sum(list,'hol')),fmt(sum(list,'ot')+sum(list,'hol')),fmt(sum(list,'night'))]);
   const text='\uFEFF'+lines.map(l=>l.map(q).join(',')).join('\n')+'\n';
   const name=`WorkDiary_${month}.csv`;
   const file=new File([text],name,{type:'text/csv'});
