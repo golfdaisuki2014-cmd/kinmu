@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="勤務管理">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#20242a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<title>勤務管理</title>
+<style>
+:root{--ink:#20242a;--road:#f2b705;--bg:#eceff2;--card:#fff;--line:#d9dee3;--sub:#68717b;--red:#c62828;
+box-sizing:border-box}
+*{box-sizing:inherit}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Hiragino Sans","Hiragino Kaku Gothic ProN",system-ui,sans-serif;-webkit-text-size-adjust:100%}
+body{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+.head{background:var(--ink);color:#fff;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 22px}
+.nav{display:flex;align-items:center;justify-content:space-between}
+.nav b{font-size:17px}
+.nav button{background:none;border:0;color:#fff;font-size:22px;padding:6px 14px}
+.big{margin:14px 0 2px;font-size:13px;color:#b9c0c8}
+.ot{font-size:40px;font-weight:700;color:var(--road);letter-spacing:.01em}
+.sub{display:flex;gap:22px;margin-top:10px;font-size:14px;color:#dfe3e7}
+.wrap{padding:14px 14px 0;max-width:640px;margin:0 auto}
+.rec{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+.rec .r1{display:flex;justify-content:space-between;font-weight:700}
+.rec .r2{margin-top:4px;font-size:14px}
+.rec .r3{margin-top:4px;font-size:12px;color:var(--sub);display:flex;justify-content:space-between}
+.empty{color:var(--sub);text-align:center;padding:28px 0}
+.fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--road);border:0;border-radius:28px;padding:15px 22px;font-weight:700;color:var(--ink);box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.link{background:none;border:0;color:#1a5fb4;padding:12px 0;font-size:15px}
+.sheet{position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:5}
+.bar{position:sticky;top:0;background:var(--ink);color:#fff;display:flex;justify-content:space-between;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 10px;z-index:2}
+.bar button{background:none;border:0;color:#fff;font-size:16px;padding:8px 10px}
+.bar .ok{color:var(--road);font-weight:700}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:10px;margin:12px 0;padding:6px 14px}
+.sec h3{margin:10px 0 4px;font-size:13px;color:var(--sub);font-weight:600}
+.row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+input[type=text],input[type=date],input[type=time],textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff;font-size:16px}
+.row input[type=date],.row input[type=time]{width:auto}
+textarea{min-height:90px;margin:6px 0 10px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:8px 0 10px}
+.chip{flex:none;border:1px solid var(--line);background:#f6f7f8;border-radius:16px;padding:5px 12px;font-size:14px}
+.step{display:flex;align-items:center;gap:10px}
+.step button{width:34px;height:34px;border-radius:17px;border:1px solid var(--line);background:#fff;font-size:20px}
+.calc b{color:var(--red)}
+.note{font-size:12px;color:var(--sub);padding:6px 0 10px}
+.x{background:none;border:0;color:var(--sub);font-size:18px;padding:0 6px}
+.add{display:flex;gap:8px;padding:8px 0 4px}
+.add button{border:0;background:var(--ink);color:#fff;border-radius:8px;padding:0 16px}
+.del{display:block;margin:18px auto;background:none;border:0;color:var(--red);font-size:15px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const load=(k,d)=>{try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}};
+const store=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){alert('保存できませんでした。ブラウザの設定を確認してください。');return false}};
+const p2=n=>String(n).padStart(2,'0');
+const ymd=d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+const fmt=m=>`${Math.floor(m/60)}時間${m%60}分`;
+const mins=t=>{const [h,m]=(t||'0:0').split(':').map(Number);return h*60+m};
+const dlabel=s=>new Date(s+'T00:00').toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'});
+
+let records=load('WorkRecords',[]);
+let tasks=load('TaskOptions',[]);
+let month=ymd(new Date()).slice(0,7);
+let draft=null;
+
+// 拘束9時間＋休憩1時間。超過＝9時間超過分＋休憩不足分。深夜(22-翌5時)は別集計。
+function calc(r){
+  const s=mins(r.start);let e=mins(r.end);if(e<=s)e+=1440;
+  const span=e-s,brk=Number(r.brk)||0;
+  const ot=Math.max(0,span-540)+Math.max(0,60-brk);
+  let night=0;
+  for(const [a,b] of [[0,300],[1320,1740],[2760,3180]])night+=Math.max(0,Math.min(e,b)-Math.max(s,a));
+  return{span,work:Math.max(0,span-brk),ot,night};
+}
+const inMonth=()=>records.filter(r=>r.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date));
+const sum=(list,k)=>list.reduce((t,r)=>t+calc(r)[k],0);
+
+function shiftMonth(n){
+  const [y,m]=month.split('-').map(Number);
+  const d=new Date(y,m-1+n,1);month=`${d.getFullYear()}-${p2(d.getMonth()+1)}`;render();
+}
+
+function render(){
+  const list=inMonth();
+  const [y,m]=month.split('-');
+  $('#app').innerHTML=`
+  <div class="head">
+    <div class="nav"><button onclick="shiftMonth(-1)" aria-label="前の月">‹</button><b>${y}年${Number(m)}月</b><button onclick="shiftMonth(1)" aria-label="次の月">›</button></div>
+    <div class="big">超過勤務 合計</div>
+    <div class="ot">${fmt(sum(list,'ot'))}</div>
+    <div class="sub"><span>勤務 ${list.length}日</span><span>深夜 ${fmt(sum(list,'night'))}</span></div>
+  </div>
+  <div class="wrap">
+    ${list.length?list.map(r=>{const c=calc(r);return `
+    <button class="rec" onclick="openEditor('${r.id}')">
+      <div class="r1"><span>${dlabel(r.date)}</span><span>超過 ${fmt(c.ot)}</span></div>
+      <div class="r2">${esc(r.start)}–${esc(r.end)}　${r.route||r.companion?`コース：${esc(r.route)}　同乗者：${esc(r.companion)}`:''}</div>
+      <div class="r3"><span>深夜 ${fmt(c.night)}</span><span>${(r.tasks||[]).length}件の付帯作業</span></div>
+    </button>`}).join(''):'<div class="empty">この月の記録はありません</div>'}
+    <button class="link" onclick="exportCSV()">${Number(m)}月の記録をCSVで保存</button>
+  </div>
+  <button class="fab" onclick="openEditor()">＋ 勤務を記録</button>
+  <div id="sheet"></div>`;
+}
+
+function openEditor(id){
+  const found=records.find(r=>r.id===id);
+  draft=found?JSON.parse(JSON.stringify(found)):{id:String(Date.now()),date:ymd(new Date()),start:'08:00',end:'18:00',brk:60,route:'',companion:'',tasks:[],notes:''};
+  draft._isNew=!found;
+  renderEditor();
+}
+
+function chips(field,cur){
+  const names=[...new Set(records.map(r=>r[field]).filter(n=>n&&n!==cur))].sort();
+  return names.length?`<div class="chips">${names.map(n=>`<button type="button" class="chip" data-f="${field}" data-v="${esc(n)}">${esc(n)}</button>`).join('')}</div>`:'';
+}
+
+function calcHTML(){
+  const c=calc(draft);
+  return `<div class="row"><span>拘束時間</span><span>${fmt(c.span)}</span></div>
+  <div class="row"><span>実働時間</span><span>${fmt(c.work)}</span></div>
+  <div class="row calc"><span>超過勤務</span><b>${fmt(c.ot)}</b></div>
+  <div class="row"><span>深夜勤務</span><b style="color:inherit">${fmt(c.night)}</b></div>`;
+}
+
+function renderEditor(){
+  const d=draft;
+  $('#sheet').innerHTML=`<div class="sheet">
+  <div class="bar"><button onclick="closeEditor()">キャンセル</button><b>勤務記録</b><button class="ok" onclick="saveDraft()">保存</button></div>
+  <div class="wrap">
+    <div class="sec">
+      <div class="row"><span>勤務日</span><input type="date" id="f-date" value="${esc(d.date)}"></div>
+      <div class="row"><span>出勤</span><input type="time" id="f-start" value="${esc(d.start)}"></div>
+      <div class="row"><span>退勤</span><input type="time" id="f-end" value="${esc(d.end)}"></div>
+      <div class="row"><span>休憩</span><span class="step"><button type="button" onclick="stepBrk(-5)">−</button><b id="brk">${d.brk}分</b><button type="button" onclick="stepBrk(5)">＋</button></span></div>
+    </div>
+    <div class="sec"><h3>コース</h3><input type="text" id="f-route" value="${esc(d.route)}" placeholder="コース名">${chips('route',d.route)}</div>
+    <div class="sec"><h3>同乗者</h3><input type="text" id="f-companion" value="${esc(d.companion)}" placeholder="同乗者名">${chips('companion',d.companion)}</div>
+    <div class="sec"><h3>付帯作業（複数選択可）</h3>
+      ${tasks.map((t,i)=>`<div class="row"><label style="flex:1"><input type="checkbox" data-t="${i}" ${d.tasks.includes(t)?'checked':''}> ${esc(t)}</label><button type="button" class="x" data-rm="${i}" aria-label="項目を削除">×</button></div>`).join('')}
+      <div class="add"><input type="text" id="f-newtask" placeholder="新しい作業項目"><button type="button" onclick="addTask()">追加</button></div>
+      <div class="note">追加した項目は次回以降も使えます。</div>
+    </div>
+    <div class="sec"><h3>備考・詳細</h3><textarea id="f-notes">${esc(d.notes)}</textarea></div>
+    <div class="sec" id="calc">${calcHTML()}<div class="note">基本は拘束9時間（休憩1時間込み）。9時間を超えた分と休憩が1時間に足りない分が超過勤務です。深夜勤務（22時〜翌5時）は別に集計し、休憩は差し引きません。</div></div>
+    ${d._isNew?'':'<button class="del" onclick="delRecord()">この記録を削除</button>'}
+  </div></div>`;
+  const s=$('#sheet');
+  const bind=(id,k)=>s.querySelector(id).addEventListener('input',e=>{draft[k]=e.target.value;$('#calc').firstElementChild&&refreshCalc()});
+  bind('#f-date','date');bind('#f-start','start');bind('#f-end','end');bind('#f-route','route');bind('#f-companion','companion');bind('#f-notes','notes');
+  s.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{draft[b.dataset.f]=b.dataset.v;s.querySelector('#f-'+b.dataset.f).value=b.dataset.v});
+  s.querySelectorAll('[data-t]').forEach(c=>c.onchange=()=>{const t=tasks[c.dataset.t];draft.tasks=draft.tasks.filter(x=>x!==t);if(c.checked)draft.tasks.push(t)});
+  s.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
+    const t=tasks[b.dataset.rm];if(!confirm(`「${t}」を作業項目から削除しますか？`))return;
+    tasks.splice(b.dataset.rm,1);draft.tasks=draft.tasks.filter(x=>x!==t);store('TaskOptions',tasks);renderEditor()});
+}
+function refreshCalc(){const n=$('#calc .note');const html=calcHTML();$('#calc').innerHTML=html;$('#calc').appendChild(n)}
+function stepBrk(n){draft.brk=Math.max(0,Math.min(300,(Number(draft.brk)||0)+n));$('#brk').textContent=draft.brk+'分';refreshCalc()}
+function addTask(){
+  const el=$('#f-newtask'),name=el.value.trim();
+  if(!name||tasks.includes(name))return;
+  tasks.push(name);draft.tasks.push(name);store('TaskOptions',tasks);renderEditor();
+}
+function closeEditor(){draft=null;$('#sheet').innerHTML=''}
+function saveDraft(){
+  if(!draft.date||!draft.start||!draft.end){alert('勤務日と出退勤時刻を入力してください。');return}
+  const clash=records.find(r=>r.date===draft.date&&r.id!==draft.id);
+  if(clash&&!confirm(`${dlabel(draft.date)}の記録がすでにあります。置き換えますか？`))return;
+  const rec={...draft};delete rec._isNew;
+  records=records.filter(r=>r.id!==rec.id&&r.date!==rec.date);
+  records.push(rec);records.sort((a,b)=>b.date.localeCompare(a.date));
+  if(store('WorkRecords',records)){month=rec.date.slice(0,7);closeEditor();render()}
+}
+function delRecord(){
+  if(!confirm('この記録を削除しますか？'))return;
+  records=records.filter(r=>r.id!==draft.id);store('WorkRecords',records);closeEditor();render();
+}
+
+async function exportCSV(){
+  const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const list=inMonth().reverse();
+  const lines=[['勤務日','出勤時刻','退勤時刻','休憩時間(分)','コース','同乗者','付帯作業','備考','実働時間','超過勤務','深夜勤務']];
+  for(const r of list){const c=calc(r);lines.push([r.date,r.start,r.end,r.brk,r.route,r.companion,(r.tasks||[]).join('、'),r.notes,fmt(c.work),fmt(c.ot),fmt(c.night)])}
+  lines.push([`合計（${list.length}日）`,'','','','','','','',fmt(sum(list,'work')),fmt(sum(list,'ot')),fmt(sum(list,'night'))]);
+  const text='\uFEFF'+lines.map(l=>l.map(q).join(',')).join('\n')+'\n';
+  const name=`WorkDiary_${month}.csv`;
+  const file=new File([text],name,{type:'text/csv'});
+  try{
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}
+  }catch(e){if(e&&e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;
+  document.body.appendChild(a);a.click();a.remove();
+}
+
+render();
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+</script>
+</body>
+</html>
