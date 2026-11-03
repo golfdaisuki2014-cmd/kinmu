@@ -25,7 +25,7 @@ button{cursor:pointer}
 .nav button{background:none;border:0;color:#fff;font-size:22px;padding:6px 14px}
 .big{margin:14px 0 2px;font-size:13px;color:#b9c0c8}
 .ot{font-size:40px;font-weight:700;color:var(--road);letter-spacing:.01em}
-.sub{display:flex;gap:22px;margin-top:10px;font-size:14px;color:#dfe3e7}
+.sub{display:flex;flex-wrap:wrap;gap:4px 22px;margin-top:10px;font-size:14px;color:#dfe3e7}
 .wrap{padding:14px 14px 0;max-width:640px;margin:0 auto}
 .rec{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
 .rec .r1{display:flex;justify-content:space-between;font-weight:700}
@@ -42,6 +42,7 @@ button{cursor:pointer}
 .sec h3{margin:10px 0 4px;font-size:13px;color:var(--sub);font-weight:600}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
 .row:first-of-type{border-top:0}
+input[type=checkbox]{width:20px;height:20px;vertical-align:-4px;margin-right:6px}
 input[type=text],input[type=date],input[type=time],textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 10px;background:#fff;font-size:16px}
 .row input[type=date],.row input[type=time]{width:auto}
 textarea{min-height:90px;margin:6px 0 10px}
@@ -76,13 +77,15 @@ let month=ymd(new Date()).slice(0,7);
 let draft=null;
 
 // 拘束9時間＋休憩1時間。超過＝9時間超過分＋休憩不足分。深夜(22-翌5時)は別集計。
+// 休日出勤の日は、実働全体を「休日勤務」とし、超過勤務には含めない。
 function calc(r){
   const s=mins(r.start);let e=mins(r.end);if(e<=s)e+=1440;
-  const span=e-s,brk=Number(r.brk)||0;
-  const ot=Math.max(0,span-540)+Math.max(0,60-brk);
+  const span=e-s,brk=Number(r.brk)||0,work=Math.max(0,span-brk);
+  let ot=Math.max(0,span-540)+Math.max(0,60-brk),hol=0;
+  if(r.holiday){hol=work;ot=0}
   let night=0;
   for(const [a,b] of [[0,300],[1320,1740],[2760,3180]])night+=Math.max(0,Math.min(e,b)-Math.max(s,a));
-  return{span,work:Math.max(0,span-brk),ot,night};
+  return{span,work,ot,hol,night};
 }
 const inMonth=()=>records.filter(r=>r.date.startsWith(month)).sort((a,b)=>b.date.localeCompare(a.date));
 const sum=(list,k)=>list.reduce((t,r)=>t+calc(r)[k],0);
@@ -100,12 +103,12 @@ function render(){
     <div class="nav"><button onclick="shiftMonth(-1)" aria-label="前の月">‹</button><b>${y}年${Number(m)}月</b><button onclick="shiftMonth(1)" aria-label="次の月">›</button></div>
     <div class="big">超過勤務 合計</div>
     <div class="ot">${fmt(sum(list,'ot'))}</div>
-    <div class="sub"><span>勤務 ${list.length}日</span><span>深夜 ${fmt(sum(list,'night'))}</span></div>
+    <div class="sub"><span>勤務 ${list.length}日</span><span>休日勤務 ${fmt(sum(list,'hol'))}</span><span>深夜 ${fmt(sum(list,'night'))}</span></div>
   </div>
   <div class="wrap">
     ${list.length?list.map(r=>{const c=calc(r);return `
     <button class="rec" onclick="openEditor('${r.id}')">
-      <div class="r1"><span>${dlabel(r.date)}</span><span>超過 ${fmt(c.ot)}</span></div>
+      <div class="r1"><span>${dlabel(r.date)}${r.holiday?'（休日出勤）':''}</span><span>${r.holiday?'休日勤務 '+fmt(c.hol):'超過 '+fmt(c.ot)}</span></div>
       <div class="r2">${esc(r.start)}–${esc(r.end)}　${r.route||r.companion?`コース：${esc(r.route)}　同乗者：${esc(r.companion)}`:''}</div>
       <div class="r3"><span>深夜 ${fmt(c.night)}</span><span>${(r.tasks||[]).length}件の付帯作業</span></div>
     </button>`}).join(''):'<div class="empty">この月の記録はありません</div>'}
@@ -117,7 +120,7 @@ function render(){
 
 function openEditor(id){
   const found=records.find(r=>r.id===id);
-  draft=found?JSON.parse(JSON.stringify(found)):{id:String(Date.now()),date:ymd(new Date()),start:'08:00',end:'18:00',brk:60,route:'',companion:'',tasks:[],notes:''};
+  draft=found?JSON.parse(JSON.stringify(found)):{id:String(Date.now()),date:ymd(new Date()),start:'08:00',end:'18:00',brk:60,route:'',companion:'',tasks:[],notes:'',holiday:false};
   draft._isNew=!found;
   renderEditor();
 }
@@ -132,6 +135,7 @@ function calcHTML(){
   return `<div class="row"><span>拘束時間</span><span>${fmt(c.span)}</span></div>
   <div class="row"><span>実働時間</span><span>${fmt(c.work)}</span></div>
   <div class="row calc"><span>超過勤務</span><b>${fmt(c.ot)}</b></div>
+  <div class="row"><span>休日勤務</span><b style="color:inherit">${fmt(c.hol)}</b></div>
   <div class="row"><span>深夜勤務</span><b style="color:inherit">${fmt(c.night)}</b></div>`;
 }
 
@@ -145,6 +149,7 @@ function renderEditor(){
       <div class="row"><span>出勤</span><input type="time" id="f-start" value="${esc(d.start)}"></div>
       <div class="row"><span>退勤</span><input type="time" id="f-end" value="${esc(d.end)}"></div>
       <div class="row"><span>休憩</span><span class="step"><button type="button" onclick="stepBrk(-5)">−</button><b id="brk">${d.brk}分</b><button type="button" onclick="stepBrk(5)">＋</button></span></div>
+      <div class="row"><label style="flex:1"><input type="checkbox" id="f-holiday" ${d.holiday?'checked':''}> 休日出勤</label></div>
     </div>
     <div class="sec"><h3>コース</h3><input type="text" id="f-route" value="${esc(d.route)}" placeholder="コース名">${chips('route',d.route)}</div>
     <div class="sec"><h3>同乗者</h3><input type="text" id="f-companion" value="${esc(d.companion)}" placeholder="同乗者名">${chips('companion',d.companion)}</div>
@@ -154,11 +159,12 @@ function renderEditor(){
       <div class="note">追加した項目は次回以降も使えます。</div>
     </div>
     <div class="sec"><h3>備考・詳細</h3><textarea id="f-notes">${esc(d.notes)}</textarea></div>
-    <div class="sec" id="calc">${calcHTML()}<div class="note">基本は拘束9時間（休憩1時間込み）。9時間を超えた分と休憩が1時間に足りない分が超過勤務です。深夜勤務（22時〜翌5時）は別に集計し、休憩は差し引きません。</div></div>
+    <div class="sec" id="calc">${calcHTML()}<div class="note">基本は拘束9時間（休憩1時間込み）。9時間を超えた分と休憩が1時間に足りない分が超過勤務です。休日出勤にチェックを入れた日は、実働の全体を休日勤務として別に集計し、超過勤務には含めません。深夜勤務（22時〜翌5時）も別に集計し、休憩は差し引きません。</div></div>
     ${d._isNew?'':'<button class="del" onclick="delRecord()">この記録を削除</button>'}
   </div></div>`;
   const s=$('#sheet');
   const bind=(id,k)=>s.querySelector(id).addEventListener('input',e=>{draft[k]=e.target.value;$('#calc').firstElementChild&&refreshCalc()});
+  s.querySelector('#f-holiday').onchange=e=>{draft.holiday=e.target.checked;refreshCalc()};
   bind('#f-date','date');bind('#f-start','start');bind('#f-end','end');bind('#f-route','route');bind('#f-companion','companion');bind('#f-notes','notes');
   s.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{draft[b.dataset.f]=b.dataset.v;s.querySelector('#f-'+b.dataset.f).value=b.dataset.v});
   s.querySelectorAll('[data-t]').forEach(c=>c.onchange=()=>{const t=tasks[c.dataset.t];draft.tasks=draft.tasks.filter(x=>x!==t);if(c.checked)draft.tasks.push(t)});
@@ -191,9 +197,9 @@ function delRecord(){
 async function exportCSV(){
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
   const list=inMonth().reverse();
-  const lines=[['勤務日','出勤時刻','退勤時刻','休憩時間(分)','コース','同乗者','付帯作業','備考','実働時間','超過勤務','深夜勤務']];
-  for(const r of list){const c=calc(r);lines.push([r.date,r.start,r.end,r.brk,r.route,r.companion,(r.tasks||[]).join('、'),r.notes,fmt(c.work),fmt(c.ot),fmt(c.night)])}
-  lines.push([`合計（${list.length}日）`,'','','','','','','',fmt(sum(list,'work')),fmt(sum(list,'ot')),fmt(sum(list,'night'))]);
+  const lines=[['勤務日','出勤時刻','退勤時刻','休憩時間(分)','休日出勤','コース','同乗者','付帯作業','備考','実働時間','超過勤務','休日勤務','深夜勤務']];
+  for(const r of list){const c=calc(r);lines.push([r.date,r.start,r.end,r.brk,r.holiday?'○':'',r.route,r.companion,(r.tasks||[]).join('、'),r.notes,fmt(c.work),fmt(c.ot),fmt(c.hol),fmt(c.night)])}
+  lines.push([`合計（${list.length}日）`,'','','','','','','','',fmt(sum(list,'work')),fmt(sum(list,'ot')),fmt(sum(list,'hol')),fmt(sum(list,'night'))]);
   const text='\uFEFF'+lines.map(l=>l.map(q).join(',')).join('\n')+'\n';
   const name=`WorkDiary_${month}.csv`;
   const file=new File([text],name,{type:'text/csv'});
