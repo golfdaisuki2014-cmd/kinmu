@@ -79,12 +79,12 @@ let month=ymd(new Date()).slice(0,7);
 let draft=null;
 
 // 拘束9時間＋休憩1時間。超過＝9時間超過分＋休憩不足分。深夜(22-翌5時)は別集計。
-// 休日出勤の日は、実働全体を「休日勤務」とし、超過勤務には含めない。
+// 休日出勤の日：休日勤務＝拘束時間−休憩1時間。休憩が1時間に足りない分は平日と同じく超過勤務。
 function calc(r){
   const s=mins(r.start);let e=mins(r.end);if(e<=s)e+=1440;
   const span=e-s,brk=Number(r.brk)||0,work=Math.max(0,span-brk);
   let ot=Math.max(0,span-540)+Math.max(0,60-brk),hol=0;
-  if(r.holiday){hol=work;ot=0}
+  if(r.holiday){hol=Math.max(0,span-60);ot=Math.max(0,60-brk)}
   let night=0;
   for(const [a,b] of [[0,300],[1320,1740],[2760,3180]])night+=Math.max(0,Math.min(e,b)-Math.max(s,a));
   return{span,work,ot,hol,night};
@@ -162,7 +162,7 @@ function renderEditor(){
       <div class="note">追加した項目は次回以降も使えます。</div>
     </div>
     <div class="sec"><h3>備考・詳細</h3><textarea id="f-notes">${esc(d.notes)}</textarea></div>
-    <div class="sec" id="calc">${calcHTML()}<div class="note">基本は拘束9時間（休憩1時間込み）。9時間を超えた分と休憩が1時間に足りない分が超過勤務です。休日出勤にチェックを入れた日は、実働の全体を休日勤務として別に集計し、超過勤務には含めません。深夜勤務（22時〜翌5時）も別に集計し、休憩は差し引きません。</div></div>
+    <div class="sec" id="calc">${calcHTML()}<div class="note">基本は拘束9時間（休憩1時間込み）。9時間を超えた分と休憩が1時間に足りない分が超過勤務です。休日出勤にチェックを入れた日は、拘束時間から休憩1時間を引いた時間を休日勤務として別に集計します（9時間超過分は超過勤務にしません）。休憩が1時間に足りない場合は、平日と同じく不足分が超過勤務になります。深夜勤務（22時〜翌5時）も別に集計し、休憩は差し引きません。</div></div>
     ${d._isNew?'':'<button class="del" onclick="delRecord()">この記録を削除</button>'}
   </div></div>`;
   const s=$('#sheet');
